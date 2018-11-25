@@ -1,0 +1,22 @@
+[package]
+name = "audio-featrs"
+version = "0.1.0"
+authors = ["Hendrik Schröter <h.schroeter@pm.me>"]
+
+[dependencies]
+rustfft = "2.1.0"
+num-traits = "0.2.0"
+ndarray = "0.12.0"
+
+[dev-dependencies]
+pyo3 = "^0.5.0-alpha.2"
+numpy = "0.4.0-alpha.1"
+rand = "0.5.5"
+ndarray-rand = "0.8"
+
+[profile.release]
+panic="abort"
+opt-level=3
+lto=true
+codegen-units=1
+incremental=false
