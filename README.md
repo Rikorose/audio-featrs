@@ -14,16 +14,21 @@ use ndarray_rand::RandomExt;
 use rand::distributions::Range;
 use audio_featrs::{StftBuilder, PadMode, get_window, Window};
 
-let x = Array1::<f32>::random(Dim(10), Range::new(-1., 1.));
-let stft = StftBuilder::new()
-    .n_fft(1024)
-    .normalize(true)
-    .pad_mode(PadMode::End)
-    .hop_length(441)
-    .window(get_window(Window::Hann)
-    .build()
- 
-let spec = stft.process(x.as_slice().unwrap().to_vec());
+fn main() {
+    let size = 10;
+    let x = Array1::<f32>::random(Dim(size), Range::new(-1., 1.));
+    println!("Signal: {:?}", x);
+    let stft = StftBuilder::new()
+        .n_fft(size)
+        .normalize(true)
+        .pad_mode(PadMode::Truncate)
+        .hop_length(441)
+        .window(get_window(Window::Hann, size, true))
+        .build();
+
+    let spec = stft.process(x.as_slice().unwrap().to_vec());
+    println!("Spectrogram: {:?}", spec);
+}
 ```
 
 ## Credits
