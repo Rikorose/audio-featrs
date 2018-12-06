@@ -1,0 +1,12 @@
+[package]
+name = "wav2png"
+version = "0.1.0"
+authors = ["Hendrik Schröter <hendrik.m.schroeter@fau.de>"]
+edition = "2018"
+
+[dependencies]
+hound = "3.4"
+png = "0.13"
+itertools = "0.7.8"
+ndarray = "0.12.0"
+audio-featrs = { path = "../.." }
