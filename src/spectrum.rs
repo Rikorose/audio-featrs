@@ -4,7 +4,6 @@ use std::option::Option;
 use std::sync::Arc;
 
 use ndarray::prelude::*;
-use ndarray::ScalarOperand;
 use ndarray::Zip;
 use num_traits::Float;
 
@@ -12,6 +11,9 @@ use rustfft::num_complex::Complex;
 use rustfft::{FFTplanner, FFT};
 
 use windows;
+use StftNum;
+
+type Result<T> = ::std::result::Result<T, Box<::std::error::Error>>;
 
 pub enum PadMode {
     Truncate,
@@ -44,10 +46,7 @@ pub struct StftBuilder<T> {
     normalize: Option<bool>,
 }
 
-impl<T> StftBuilder<T>
-where
-    T: Clone + Sized + Float + ScalarOperand + rustfft::FFTnum,
-{
+impl<T: StftNum> StftBuilder<T> {
     pub fn new() -> StftBuilder<T> {
         StftBuilder {
             n_fft: None,
@@ -91,11 +90,13 @@ where
         self.normalize = Some(normalize);
         self
     }
-    pub fn build(self) -> Stft<T> {
+    pub fn build(self) -> Result<Stft<T>> {
         let n_fft = self.n_fft.unwrap_or(2048);
         let win_length = self.win_length.unwrap_or(n_fft);
         let hop_length = self.hop_length.unwrap_or(win_length / 4);
-        assert!(win_length <= n_fft, "STFT win_length must be <= n_fft");
+        if win_length > n_fft {
+            return Err(From::from("STFT win_length must be <= n_fft"));
+        }
         let pad_mode = self.pad_mode.unwrap_or_default();
         let mut window = Array1::<T>::zeros(n_fft);
         let w_start = (n_fft - win_length) / 2;
@@ -106,7 +107,9 @@ where
                     windows::get_window(self.window_named.unwrap_or_default(), win_length, true)
                 }
                 Some(w) => {
-                    assert_eq!(w.len(), win_length);
+                    if w.len() != win_length {
+                        return Err(From::from("Window length must be equal to n_fft."));
+                    }
                     w
                 }
             });
@@ -116,18 +119,18 @@ where
         };
         let mut planner = FFTplanner::new(false);
         let fft = planner.plan_fft(n_fft);
-        Stft {
+        Ok(Stft {
             n_fft: n_fft,
             hop_length: hop_length,
             pad_mode: pad_mode,
             window: window,
             fft: fft,
             normalization: normalization,
-        }
+        })
     }
 }
 
-impl<T: Clone + Float + rustfft::FFTnum> Stft<T> {
+impl<T: StftNum + std::fmt::Debug + std::fmt::Display> Stft<T> {
     fn pad(&self, mut signal: Vec<T>) -> Vec<T> {
         match self.pad_mode {
             PadMode::Truncate => signal,
@@ -155,7 +158,7 @@ impl<T: Clone + Float + rustfft::FFTnum> Stft<T> {
         }
     }
 
-    pub fn process(&self, signal: Vec<T>) -> Array2<T> {
+    pub fn process(&self, signal: Vec<T>) -> Result<Array2<T>> {
         let signal = self.pad(signal);
         let n_frames = 1 + (signal.len() - self.n_fft) / self.hop_length;
 
@@ -165,10 +168,10 @@ impl<T: Clone + Float + rustfft::FFTnum> Stft<T> {
         let n_freqs = self.n_fft / 2 + 1;
         let mut output = Array2::<T>::zeros((n_freqs, n_frames).f());
 
-        for i in 0..n_frames {
+        for frame in 0..n_frames {
             // Get slice of input audio multiply it with the window
             // and copy it to the input buffer
-            let start = i * self.hop_length;
+            let start = frame * self.hop_length;
             let end = min(signal.len(), start + self.n_fft);
             Zip::from(&mut fft_input)
                 .and(&self.window)
@@ -179,20 +182,18 @@ impl<T: Clone + Float + rustfft::FFTnum> Stft<T> {
 
             // Perform FFT
             self.fft.process(
-                &mut fft_input.as_slice_mut().unwrap(),
-                &mut fft_output.as_slice_mut().unwrap(),
+                &mut fft_input.as_slice_mut().ok_or("Stft input is None")?,
+                &mut fft_output.as_slice_mut().ok_or("Stft output is None")?,
             );
 
             // And copy onesided to the output buffer
-            output.slice_mut(s![.., i]).assign(
+            output.slice_mut(s![.., frame]).assign(
                 &fft_output
                     .slice_mut(s![0..n_freqs])
-                    .mapv(|v| v / self.normalization)
-                    .mapv(|v| v.norm() as T),
+                    .map(|v| (v / self.normalization).norm() as T),
             );
         }
-
-        output
+        Ok(output)
     }
 }
 
