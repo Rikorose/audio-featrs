@@ -3,8 +3,16 @@ extern crate ndarray;
 extern crate num_traits;
 extern crate rustfft;
 
+use ndarray::ScalarOperand;
+use num_traits::Float;
+
 mod spectrum;
 pub mod windows;
+
+pub trait StftNum: Float + rustfft::FFTnum + ScalarOperand {}
+
+impl StftNum for f32 {}
+impl StftNum for f64 {}
 
 pub use spectrum::{amplitude_to_db, normalize, power_to_db, PadMode, Stft, StftBuilder};
 pub use windows::{get_window, hamming, hann, Window};

@@ -1,8 +1,8 @@
 use std::f64::consts::PI;
 
 use ndarray::prelude::*;
-use ndarray::ScalarOperand;
-use num_traits::{Float, FromPrimitive, Zero};
+
+use StftNum;
 
 pub enum Window {
     Hann,
@@ -18,7 +18,7 @@ impl Default for Window {
 #[inline(always)]
 pub fn get_window<T>(window: Window, size: usize, fftbins: bool) -> Array1<T>
 where
-    T: Float + FromPrimitive + ScalarOperand,
+    T: StftNum,
 {
     let sym = !fftbins;
     match window {
@@ -38,23 +38,20 @@ fn _extend(size: usize, sym: bool) -> (usize, bool) {
 #[inline(always)]
 fn _maybe_truncate<T>(w: &mut Array1<T>, needed: bool) {
     if needed {
-        w.slice_inplace(s![..-1]);
+        w.slice_collapse(s![..-1]);
     }
 }
 
 fn general_cosine<T>(size: usize, a: &[T], sym: bool) -> Array1<T>
 where
-    T: Float + FromPrimitive + Zero + Clone + ScalarOperand,
+    T: StftNum,
 {
     let (size, needs_trunk) = _extend(size, sym);
     let pi = T::from(PI).unwrap();
     let fac = Array1::<T>::linspace(-pi, pi, size);
     let mut w = Array1::<T>::zeros(size);
     for k in 0..a.len() {
-        let tmp: Array1<T> = fac.map(|v| T::cos(*v * T::from(k).unwrap())) * T::from(a[k]).unwrap();
-        w = w + tmp;
-        // TODO:
-        //w += &tmp;
+        w = w + fac.map(|v| T::cos(*v * T::from(k).unwrap())) * a[k];
     }
     _maybe_truncate(&mut w, needs_trunk);
     w
@@ -62,21 +59,21 @@ where
 
 fn general_hamming<T>(size: usize, alpha: T, sym: bool) -> Array1<T>
 where
-    T: Float + FromPrimitive + ScalarOperand,
+    T: StftNum,
 {
-    general_cosine::<T>(size, &[alpha, T::from(1.0).unwrap() - alpha], sym)
+    general_cosine::<T>(size, &[alpha, T::from(1f64).unwrap() - alpha], sym)
 }
 
 pub fn hamming<T>(size: usize, sym: bool) -> Array1<T>
 where
-    T: Float + FromPrimitive + ScalarOperand,
+    T: StftNum,
 {
     general_hamming::<T>(size, T::from(0.54).unwrap(), sym)
 }
 
 pub fn hann<T>(size: usize, sym: bool) -> Array1<T>
 where
-    T: Float + FromPrimitive + ScalarOperand,
+    T: StftNum,
 {
     general_hamming::<T>(size, T::from(0.5).unwrap(), sym)
 }
@@ -84,6 +81,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use num_traits::Float;
     use std::fmt::Debug;
 
     fn assert_close<F>(a: &[F], b: &[F], delta: F)
@@ -107,14 +105,14 @@ mod tests {
                 .as_slice()
                 .unwrap(),
             &[0.4, 0.3, 1.0, 0.3, 0.4],
-            1e-10,
+            1e-12,
         );
         assert_close(
             general_cosine(4, &[0.5, 0.3, 0.2], false)
                 .as_slice()
                 .unwrap(),
             &[0.4, 0.3, 1.0, 0.3],
-            1e-10,
+            1e-12,
         );
     }
 
@@ -123,7 +121,7 @@ mod tests {
         assert_close(
             general_hamming(5, 0.7, true).as_slice().unwrap(),
             &[0.4, 0.7, 1.0, 0.7, 0.4],
-            1e-10,
+            1e-12,
         );
         assert_close(
             general_hamming(5, 0.75, false).as_slice().unwrap(),
