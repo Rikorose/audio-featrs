@@ -1,0 +1,14 @@
+language: rust
+dist: xenial
+cache: cargo
+env: RUST_TEST_THREADS=1
+addons:
+  apt:
+    update: true
+    packages:
+      - python3-setuptools
+      - python3-pip
+before_install:
+  - pip3 install librosa
+rust:
+  - nightly
