@@ -1,8 +1,8 @@
 use std::f64::consts::PI;
 
-use ndarray::prelude::*;
+use ndarray::{prelude::*, ScalarOperand};
 
-use StftNum;
+use crate::StftNum;
 
 pub enum Window {
     Hann,
@@ -29,9 +29,10 @@ where
 
 #[inline(always)]
 fn _extend(size: usize, sym: bool) -> (usize, bool) {
-    match sym {
-        false => (size + 1, true),
-        true => (size, false),
+    if sym {
+        (size, false)
+    } else {
+        (size + 1, true)
     }
 }
 
@@ -42,7 +43,7 @@ fn _maybe_truncate<T>(w: &mut Array1<T>, needed: bool) {
     }
 }
 
-fn general_cosine<T>(size: usize, a: &[T], sym: bool) -> Array1<T>
+fn general_cosine<T: ScalarOperand>(size: usize, a: &[T], sym: bool) -> Array1<T>
 where
     T: StftNum,
 {
@@ -50,8 +51,8 @@ where
     let pi = T::from(PI).unwrap();
     let fac = Array1::<T>::linspace(-pi, pi, size);
     let mut w = Array1::<T>::zeros(size);
-    for k in 0..a.len() {
-        w = w + fac.map(|v| T::cos(*v * T::from(k).unwrap())) * a[k];
+    for (i, k) in a.iter().enumerate() {
+        w = w + fac.map(|v| T::cos(*v * T::from(i).unwrap())) * *k;
     }
     _maybe_truncate(&mut w, needs_trunk);
     w

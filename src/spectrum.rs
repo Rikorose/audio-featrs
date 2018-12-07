@@ -10,8 +10,8 @@ use num_traits::Float;
 use rustfft::num_complex::Complex;
 use rustfft::{FFTplanner, FFT};
 
-use windows;
-use StftNum;
+use crate::windows;
+use crate::StftNum;
 
 type Result<T> = ::std::result::Result<T, Box<::std::error::Error>>;
 
@@ -36,6 +36,7 @@ pub struct Stft<T> {
     fft: Arc<FFT<T>>,
 }
 
+#[derive(Default)]
 pub struct StftBuilder<T> {
     n_fft: Option<usize>,
     hop_length: Option<usize>,
@@ -113,19 +114,20 @@ impl<T: StftNum> StftBuilder<T> {
                     w
                 }
             });
-        let normalization = match self.normalize.unwrap_or(true) {
-            true => window.map(|v| v.powi(2)).scalar_sum().sqrt(),
-            false => T::one(),
+        let normalization = if self.normalize.unwrap_or(true) {
+            window.map(|v| v.powi(2)).scalar_sum().sqrt()
+        } else {
+            T::one()
         };
         let mut planner = FFTplanner::new(false);
         let fft = planner.plan_fft(n_fft);
         Ok(Stft {
-            n_fft: n_fft,
-            hop_length: hop_length,
-            pad_mode: pad_mode,
-            window: window,
-            fft: fft,
-            normalization: normalization,
+            n_fft,
+            hop_length,
+            pad_mode,
+            window,
+            fft,
+            normalization,
         })
     }
 }

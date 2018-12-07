@@ -14,5 +14,5 @@ pub trait StftNum: Float + rustfft::FFTnum + ScalarOperand {}
 impl StftNum for f32 {}
 impl StftNum for f64 {}
 
-pub use spectrum::{amplitude_to_db, normalize, power_to_db, PadMode, Stft, StftBuilder};
-pub use windows::{get_window, hamming, hann, Window};
+pub use crate::spectrum::{amplitude_to_db, normalize, power_to_db, PadMode, Stft, StftBuilder};
+pub use crate::windows::{get_window, hamming, hann, Window};
