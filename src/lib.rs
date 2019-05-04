@@ -6,6 +6,7 @@ extern crate rustfft;
 use ndarray::ScalarOperand;
 use num_traits::Float;
 
+pub mod filters;
 mod spectrum;
 pub mod windows;
 

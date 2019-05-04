@@ -63,6 +63,7 @@ fn main() -> Result<()> {
             return Err(From::from("Input audio file not found"));
         }
         let mut reader = hound::WavReader::open(&p.as_os_str())?;
+        let sr = reader.spec().sample_rate as usize;
         println!(
             "Reading file with {} channels, sample rate {} and length {}",
             reader.spec().channels,
@@ -72,27 +73,31 @@ fn main() -> Result<()> {
         let samples = read_wav(&mut reader, true).collect::<Vec<f32>>();
 
         // Spectrogram params
-        let n_fft = 1024;
-        let n_hop = 512;
+        let n_fft = 2048;
+        let n_hop = 441;
         let min_level_db = Some(-80);
         let ref_level_db = Some(20);
+        let n_mel = 150;
+        let f_min = Some(512.);
+        let f_max = Some(16000.);
         let stft = StftBuilder::new()
             .n_fft(n_fft)
             .hop_length(n_hop)
             .pad_mode(PadMode::Center)
             .build()?;
-        let mut spec = stft.process(samples)?;
-        amplitude_to_db(&mut spec);
-        normalize(&mut spec, min_level_db, ref_level_db);
+        let spec = stft.process(samples)?;
+        let mut mel_spec = spec.t().dot(&filters::mel(sr, n_fft, n_mel, f_min, f_max)?);
+        amplitude_to_db(&mut mel_spec);
+        normalize(&mut mel_spec, min_level_db, ref_level_db);
 
         // Convert to image buffer
-        spec.invert_axis(Axis(0));
-        let img = spec.iter().map(|v| (v * 255.0) as u8).collect::<Vec<u8>>();
+        mel_spec.invert_axis(Axis(1));
+        let img = mel_spec.t().iter().map(|v| ((1. - v) * 255.0) as u8).collect::<Vec<u8>>();
 
         // Setup png writer
         let file = File::create(p.with_extension("png"))?;
         let ref mut w = io::BufWriter::new(file);
-        let mut encoder = png::Encoder::new(w, spec.shape()[1] as u32, spec.shape()[0] as u32);
+        let mut encoder = png::Encoder::new(w, mel_spec.shape()[0] as u32, mel_spec.shape()[1] as u32);
         encoder.set(png::ColorType::Grayscale);
         let mut writer = encoder.write_header()?;
         writer.write_image_data(&img)?;
